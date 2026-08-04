@@ -53,9 +53,9 @@ func TestRunAuthSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	cbPort := cbLn.Addr().(*net.TCPAddr).Port
-	oldListen := listenLoopback
-	listenLoopback = func() (net.Listener, error) { return cbLn, nil }
-	t.Cleanup(func() { listenLoopback = oldListen })
+	oldListen := listenCallback
+	listenCallback = func() (net.Listener, error) { return cbLn, nil }
+	t.Cleanup(func() { listenCallback = oldListen })
 
 	oldOpen := openBrowser
 	openBrowser = func(authURL string) error {
@@ -122,9 +122,9 @@ func TestRunAuthStateMismatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	cbPort := cbLn.Addr().(*net.TCPAddr).Port
-	oldListen := listenLoopback
-	listenLoopback = func() (net.Listener, error) { return cbLn, nil }
-	t.Cleanup(func() { listenLoopback = oldListen })
+	oldListen := listenCallback
+	listenCallback = func() (net.Listener, error) { return cbLn, nil }
+	t.Cleanup(func() { listenCallback = oldListen })
 
 	oldOpen := openBrowser
 	openBrowser = func(string) error {

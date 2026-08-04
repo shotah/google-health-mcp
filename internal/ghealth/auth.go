@@ -12,15 +12,18 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
 )
 
 const (
-	oauthTimeout      = 5 * time.Minute
-	readHeaderTimeout = 10 * time.Second
-	googleAuthURL     = "https://accounts.google.com/o/oauth2/auth"
+	oauthTimeout             = 5 * time.Minute
+	readHeaderTimeout        = 10 * time.Second
+	defaultOAuthCallbackPort = 4101 // distinct from google-mcp Workspace auth (:4100)
+	googleAuthURL            = "https://accounts.google.com/o/oauth2/auth"
 	//nolint:gosec // G101: OAuth token endpoint URL, not a credential
 	googleTokenURL = "https://oauth2.googleapis.com/token"
 )
@@ -28,9 +31,27 @@ const (
 // openBrowser opens url in the default browser (overridable in tests).
 var openBrowser = openBrowserOS
 
-// listenLoopback binds 127.0.0.1:0 (overridable in tests).
-var listenLoopback = func() (net.Listener, error) {
-	return net.Listen("tcp", "127.0.0.1:0")
+// listenCallback binds the OAuth callback (overridable in tests).
+// Default: fixed port on all interfaces so Docker can publish
+// -p 127.0.0.1:4101:4101; redirect_uri stays http://127.0.0.1:<port>/…
+var listenCallback = func() (net.Listener, error) {
+	port := defaultOAuthCallbackPort
+	if raw := strings.TrimSpace(os.Getenv("GOOGLE_HEALTH_OAUTH_PORT")); raw != "" {
+		if p, err := strconv.Atoi(raw); err == nil && p > 0 && p < 65536 {
+			port = p
+		}
+	}
+	host := strings.TrimSpace(os.Getenv("GOOGLE_HEALTH_OAUTH_BIND"))
+	if host == "" {
+		host = "0.0.0.0"
+	}
+	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	if err != nil {
+		// Fixed port busy — ephemeral fallback (Docker -p may not match).
+		fmt.Fprintf(os.Stderr, "oauth: port %d busy; using ephemeral (%v)\n", port, err)
+		return net.Listen("tcp", net.JoinHostPort(host, "0"))
+	}
+	return ln, nil
 }
 
 // oauthEndpoints are overridable in tests (fake auth/token servers).
@@ -64,7 +85,7 @@ func RunAuth(ctx context.Context, c *Client) error {
 	state := hex.EncodeToString(stateBytes)
 	verifier := oauth2.GenerateVerifier()
 
-	ln, err := listenLoopback()
+	ln, err := listenCallback()
 	if err != nil {
 		return fmt.Errorf("listen for OAuth callback: %w", err)
 	}
@@ -73,6 +94,7 @@ func RunAuth(ctx context.Context, c *Client) error {
 		_ = ln.Close()
 		return errors.New("unexpected OAuth listener address type")
 	}
+	// Loopback redirect for Google's OAuth client (port matches the listener).
 	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/oauth2callback", tcpAddr.Port)
 
 	cfg := c.oauthConfig()
