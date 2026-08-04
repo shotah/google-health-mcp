@@ -68,8 +68,9 @@ Same recipes as `garmin__…` — swap prefix for Fitbit friends.
 
 ## Setup
 
-1. Personal GCP project → enable **Google Health API** → OAuth Web client
-   ([setup](https://developers.google.com/health/setup)).
+1. Personal GCP project →
+   [enable Google Health API](https://console.cloud.google.com/apis/library/health.googleapis.com)
+   → OAuth Web client ([setup](https://developers.google.com/health/setup)).
 2. Authorized redirect URI:
    `http://127.0.0.1:4101/oauth2callback`
 3. Add **readonly** scopes you need on the Data Access page (Restricted —
@@ -126,7 +127,7 @@ OAuth CLI. See [TODO.md](TODO.md) for release / ai-gantry wiring.
 name = "ghealth"
 command = "google-health-mcp"
 auth_args = ["auth"]
-download_tag = "v0.0.3"
+download_tag = "latest"
 download_url = "https://github.com/shotah/google-health-mcp/releases/download/{tag}/google-health-mcp_{version}_{os}_{arch}.tar.gz"
 ```
 
