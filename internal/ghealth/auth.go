@@ -20,7 +20,7 @@ import (
 const (
 	oauthTimeout      = 5 * time.Minute
 	readHeaderTimeout = 10 * time.Second
-	googleAuthURL = "https://accounts.google.com/o/oauth2/auth"
+	googleAuthURL     = "https://accounts.google.com/o/oauth2/auth"
 	//nolint:gosec // G101: OAuth token endpoint URL, not a credential
 	googleTokenURL = "https://oauth2.googleapis.com/token"
 )

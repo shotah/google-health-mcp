@@ -4,6 +4,15 @@
 
 # google-health-mcp
 
+<p align="center">
+  <a href="https://github.com/shotah/google-health-mcp/actions/workflows/ci.yml"><img src="https://github.com/shotah/google-health-mcp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/shotah/google-health-mcp/actions/workflows/release.yml"><img src="https://github.com/shotah/google-health-mcp/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+  <a href="https://github.com/shotah/google-health-mcp/actions/workflows/ci.yml"><img src="https://github.com/shotah/google-health-mcp/raw/gh-pages/badges/coverage.svg" alt="Coverage"></a>
+  <a href="https://pkg.go.dev/github.com/shotah/google-health-mcp"><img src="https://pkg.go.dev/badge/github.com/shotah/google-health-mcp.svg" alt="Go Reference"></a>
+  <img src="https://img.shields.io/github/go-mod/go-version/shotah/google-health-mcp" alt="Go version">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/shotah/google-health-mcp" alt="License"></a>
+</p>
+
 Static Go [MCP](https://modelcontextprotocol.io) for **Google Health** data
 from modern **Fitbit / Pixel Watch** devices via the
 [Google Health API](https://developers.google.com/health/about)
@@ -59,7 +68,7 @@ Same recipes as `garmin__…` — swap prefix for Fitbit friends.
 
 ## Setup
 
-1. Personal GCP project → enable **Google Health API** → OAuth Web client  
+1. Personal GCP project → enable **Google Health API** → OAuth Web client
    ([setup](https://developers.google.com/health/setup)).
 2. Add **readonly** scopes you need on the Data Access page (Restricted —
    testing limited to ~100 users until verification).
