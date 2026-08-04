@@ -12,7 +12,7 @@
 - [x] Tool handlers wired to data types below
 - [x] Coverage ≥70%
 - [x] Personal GitHub repo (manual — **never** work org)
-- [ ] First release + ai-gantry consumer PR
+- [x] First release (`v0.0.1`) + ai-gantry consumer PR
 
 ---
 

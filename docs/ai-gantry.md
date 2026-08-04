@@ -1,8 +1,9 @@
 # ai-gantry wiring — google-health-mcp
 
-**Do not wire until published** under a personal GitHub account + release.
+Published as [shotah/google-health-mcp](https://github.com/shotah/google-health-mcp)
+(`v0.0.1`+). Consumer wiring lives in ai-gantry `local-agent/`.
 
-## `mcp.toml` (planned)
+## `mcp.toml`
 
 ```toml
 # Google Health / Fitbit+Pixel Watch (shotah/google-health-mcp) — docs/google-health.md
