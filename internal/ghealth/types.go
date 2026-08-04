@@ -94,11 +94,11 @@ type Profile struct {
 
 // Google Health data type path segments (users/me/dataTypes/{type}).
 const (
-	DataTypeSleep                   = "sleep"
-	DataTypeExercise                = "exercise"
-	DataTypeWeight                  = "weight"
-	DataTypeDailyRestingHeartRate   = "daily-resting-heart-rate"
-	DataTypeHeartRate               = "heart-rate"
+	DataTypeSleep                     = "sleep"
+	DataTypeExercise                  = "exercise"
+	DataTypeWeight                    = "weight"
+	DataTypeDailyRestingHeartRate     = "daily-resting-heart-rate"
+	DataTypeHeartRate                 = "heart-rate"
 	DataTypeDailyHeartRateVariability = "daily-heart-rate-variability"
 )
 
