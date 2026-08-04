@@ -7,11 +7,11 @@
 - [x] Docs: README + design + why-google-health + agent + ai-gantry
 - [x] Compileable MCP stub + naming tests (Garmin-shaped core tools)
 - [x] Lazy auth (missing tokens must not fail MCP `initialize`)
-- [ ] Google OAuth2 auth CLI (`google-health-mcp auth`)
-- [ ] Real `health.googleapis.com/v4` client (`reconcile` / `list` / `get`)
-- [ ] Tool handlers wired to data types below
-- [ ] Coverage ≥70%
-- [ ] Personal GitHub repo (manual — **never** work org)
+- [x] Google OAuth2 auth CLI (`google-health-mcp auth`)
+- [x] Real `health.googleapis.com/v4` client (`reconcile` / `list` / `get`)
+- [x] Tool handlers wired to data types below
+- [x] Coverage ≥70%
+- [x] Personal GitHub repo (manual — **never** work org)
 - [ ] First release + ai-gantry consumer PR
 
 ---
@@ -33,11 +33,11 @@ Checklist:
 
 - [x] `{service}_{verb}_{object}` names; no `ghealth_` / `health_` tool prefix
 - [x] Shared nouns with garmin (`sleep_`, `activities_`, `hrv_`, …)
-- [ ] OAuth with Google (not Fitbit FOT)
-- [ ] Prefer **reconcile** stream (matches Fitbit app) for reads
-- [ ] Optional `dataSourceFamily=google-wearables` filter
-- [ ] Civil-time filters for day windows (DST-safe)
-- [ ] Token refresh on disk (`GOOGLE_HEALTH_TOKEN_PATH`)
+- [x] OAuth with Google (not Fitbit FOT)
+- [x] Prefer **reconcile** stream (matches Fitbit app) for reads
+- [x] Optional `dataSourceFamily=google-wearables` filter
+- [x] Civil-time filters for day windows (DST-safe)
+- [x] Token refresh on disk (`GOOGLE_HEALTH_TOKEN_PATH`)
 
 **Never in MVP:** write scopes, nutrition, ECG, reproductive health.
 

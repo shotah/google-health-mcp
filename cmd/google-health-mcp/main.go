@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/shotah/google-health-mcp/internal/ghealth"
 	mcpserver "github.com/shotah/google-health-mcp/internal/mcp"
 )
 
@@ -16,6 +17,9 @@ var runServer = func(ctx context.Context, s *mcpserver.Server) error {
 	return s.Run(ctx)
 }
 
+// runAuth is overridable in tests.
+var runAuth = ghealth.RunAuth
+
 func main() {
 	if version != "" && version != "dev" {
 		mcpserver.ServerVersion = version
@@ -25,8 +29,12 @@ func main() {
 
 func run(args []string) int {
 	if len(args) > 0 && args[0] == "auth" {
-		fmt.Fprintln(os.Stderr, "google-health-mcp auth: not implemented yet — see TODO.md")
-		return 1
+		c := ghealth.MaybeFromEnv()
+		if err := runAuth(context.Background(), c); err != nil {
+			fmt.Fprintf(os.Stderr, "google-health-mcp auth: %v\n", err)
+			return 1
+		}
+		return 0
 	}
 
 	fs := flag.NewFlagSet("google-health-mcp", flag.ContinueOnError)

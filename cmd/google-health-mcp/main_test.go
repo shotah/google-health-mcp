@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/shotah/google-health-mcp/internal/ghealth"
 	mcpserver "github.com/shotah/google-health-mcp/internal/mcp"
 )
 
@@ -36,9 +37,21 @@ func TestRunSelfTest(t *testing.T) {
 	}
 }
 
-func TestRunAuthStub(t *testing.T) {
+func TestRunAuthSuccess(t *testing.T) {
+	old := runAuth
+	runAuth = func(context.Context, *ghealth.Client) error { return nil }
+	t.Cleanup(func() { runAuth = old })
+	if code := run([]string{"auth"}); code != 0 {
+		t.Fatalf("want 0, got %d", code)
+	}
+}
+
+func TestRunAuthError(t *testing.T) {
+	old := runAuth
+	runAuth = func(context.Context, *ghealth.Client) error { return context.Canceled }
+	t.Cleanup(func() { runAuth = old })
 	if code := run([]string{"auth"}); code != 1 {
-		t.Fatalf("want exit 1 for unimplemented auth, got %d", code)
+		t.Fatalf("want 1, got %d", code)
 	}
 }
 

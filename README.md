@@ -18,10 +18,6 @@ Naming follows
 host server id `ghealth` → tools like `ghealth__sleep_get` (tool names do
 **not** repeat the server id).
 
-> **Local-only scaffold.** No `git init`, no GitHub repo, no push from this
-> agent. Create the repo under your **personal** account when ready — see
-> [TODO.md](TODO.md).
-
 ## New school only
 
 | Path | This package? |
@@ -36,7 +32,7 @@ available on **Google Health API**. Chris keeps [`go-garmin`](https://github.com
 
 Background: [docs/why-google-health.md](docs/why-google-health.md).
 
-## Tools (planned core tier)
+## Tools (core tier)
 
 | Tool | Google Health data type(s) |
 | --- | --- |
@@ -76,7 +72,7 @@ export GOOGLE_HEALTH_CLIENT_SECRET=...
 # export GOOGLE_HEALTH_TOKEN_PATH=...
 ```
 
-4. Auth (planned): `google-health-mcp auth` → Google OAuth → tokens on disk.
+4. Auth: `google-health-mcp auth` → Google OAuth (PKCE + loopback) → tokens on disk.
 
 ### Core scopes (readonly)
 
@@ -102,10 +98,10 @@ make cli
 make self-test
 ```
 
-Status: **docs + compileable stub** targeting `health.googleapis.com/v4`.
-Live client + OAuth in [TODO.md](TODO.md).
+Status: live `health.googleapis.com/v4` client (reconcile + wearables filter) +
+OAuth CLI. See [TODO.md](TODO.md) for release / ai-gantry wiring.
 
-## ai-gantry wiring (when published)
+## ai-gantry wiring
 
 ```toml
 [[server]]
