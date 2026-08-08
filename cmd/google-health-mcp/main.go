@@ -20,6 +20,12 @@ var runServer = func(ctx context.Context, s *mcpserver.Server) error {
 // runAuth is overridable in tests.
 var runAuth = ghealth.RunAuth
 
+// runAuthURL is overridable in tests.
+var runAuthURL = ghealth.RunAuthURL
+
+// runAuthExchange is overridable in tests.
+var runAuthExchange = ghealth.RunAuthExchange
+
 func main() {
 	if version != "" && version != "dev" {
 		mcpserver.ServerVersion = version
@@ -29,12 +35,7 @@ func main() {
 
 func run(args []string) int {
 	if len(args) > 0 && args[0] == "auth" {
-		c := ghealth.MaybeFromEnv()
-		if err := runAuth(context.Background(), c); err != nil {
-			fmt.Fprintf(os.Stderr, "google-health-mcp auth: %v\n", err)
-			return 1
-		}
-		return 0
+		return runAuthCmd(args[1:])
 	}
 
 	fs := flag.NewFlagSet("google-health-mcp", flag.ContinueOnError)
@@ -66,6 +67,39 @@ func run(args []string) int {
 	srv := mcpserver.New(nil)
 	if err := runServer(context.Background(), srv); err != nil {
 		fmt.Fprintf(os.Stderr, "mcp server error: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func runAuthCmd(args []string) int {
+	c := ghealth.MaybeFromEnv()
+	ctx := context.Background()
+
+	if len(args) > 0 {
+		switch args[0] {
+		case "url":
+			if err := runAuthURL(ctx, c); err != nil {
+				fmt.Fprintf(os.Stderr, "google-health-mcp auth url: %v\n", err)
+				return 1
+			}
+			return 0
+		case "exchange":
+			if len(args) < 2 {
+				fmt.Fprintln(os.Stderr, "usage: google-health-mcp auth exchange <code>")
+				return 2
+			}
+			if err := runAuthExchange(ctx, c, args[1]); err != nil {
+				fmt.Fprintf(os.Stderr, "google-health-mcp auth exchange: %v\n", err)
+				return 1
+			}
+			return 0
+		}
+	}
+
+	// Default: interactive localhost auth
+	if err := runAuth(ctx, c); err != nil {
+		fmt.Fprintf(os.Stderr, "google-health-mcp auth: %v\n", err)
 		return 1
 	}
 	return 0
