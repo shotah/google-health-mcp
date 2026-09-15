@@ -21,7 +21,8 @@ download_url = "https://github.com/shotah/google-health-mcp/releases/download/{t
 ```bash
 GOOGLE_HEALTH_CLIENT_ID=...
 GOOGLE_HEALTH_CLIENT_SECRET=...
-GOOGLE_HEALTH_TOKEN_PATH=/opt/gantry/data/.config/ghealth/tokens.json
+# optional — default is $DATA_DIR/.config/ghealth/tokens.json when DATA_DIR is set
+# GOOGLE_HEALTH_TOKEN_PATH=/opt/gantry/data/.config/ghealth/tokens.json
 # GOOGLE_HEALTH_MCP_VERSION=v0.0.1
 ```
 

@@ -62,9 +62,21 @@ func TestMaybeFromEnvLoadsToken(t *testing.T) {
 }
 
 func TestDefaultTokenPath(t *testing.T) {
+	t.Setenv("DATA_DIR", "")
 	p := DefaultTokenPath()
 	if p == "" {
 		t.Fatal("empty")
+	}
+}
+
+func TestDefaultTokenPathPrefersDataDir(t *testing.T) {
+	t.Setenv("DATA_DIR", "/data")
+	t.Setenv("HOME", "/home/nonroot")
+	t.Setenv("XDG_CONFIG_HOME", "/home/nonroot/.config")
+	got := DefaultTokenPath()
+	want := filepath.FromSlash("/data/.config/ghealth/tokens.json")
+	if got != want {
+		t.Fatalf("DefaultTokenPath = %q, want %q (DATA_DIR volume, not overlay HOME)", got, want)
 	}
 }
 

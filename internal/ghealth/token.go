@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,8 +29,12 @@ func (c *Client) tokenMu() *sync.Mutex {
 	return c.mu
 }
 
-// DefaultTokenPath returns the default tokens.json under the user config dir.
+// DefaultTokenPath returns the default tokens.json.
+// $DATA_DIR/.config/ghealth wins on gantry (Distroless HOME is overlay).
 func DefaultTokenPath() string {
+	if data := strings.TrimSpace(os.Getenv("DATA_DIR")); data != "" {
+		return filepath.Join(data, ".config", "ghealth", "tokens.json")
+	}
 	dir, err := os.UserConfigDir()
 	if err != nil || dir == "" {
 		return "tokens.json"

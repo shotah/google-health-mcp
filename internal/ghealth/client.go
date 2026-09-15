@@ -58,9 +58,10 @@ func MaybeFromEnv() *Client {
 		PreferWearables: true,
 		mu:              &sync.Mutex{},
 	}
-	if c.TokenPath != "" {
-		_ = c.LoadToken() // best-effort; missing file is fine at boot
+	if c.TokenPath == "" {
+		c.TokenPath = DefaultTokenPath()
 	}
+	_ = c.LoadToken() // best-effort; missing file is fine at boot
 	return c
 }
 

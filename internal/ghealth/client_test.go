@@ -32,6 +32,10 @@ func TestRequireAuth(t *testing.T) {
 }
 
 func TestAccountStatusUnauthed(t *testing.T) {
+	t.Setenv("GOOGLE_HEALTH_TOKEN_PATH", "")
+	t.Setenv("DATA_DIR", "")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
 	c := MaybeFromEnv()
 	st := c.AccountStatus()
 	if st["authenticated"] != false {
