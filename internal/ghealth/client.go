@@ -91,29 +91,35 @@ func (c *Client) wearables() bool {
 	return c.PreferWearables
 }
 
-func (c *Client) SleepGet(ctx context.Context, req SleepGetRequest) (*SleepResult, error) {
-	filter, day, err := filterDaySession("sleep", req.Date, nowFn())
+func (c *Client) SleepGet(ctx context.Context, req SleepGetRequest) (*SleepListResult, error) {
+	filter, err := filterSleepWindow(req.Date, req.AfterDate, req.BeforeDate, nowFn())
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.reconcileDataPoints(ctx, reconcileOpts{
+	// exercise/sleep reconcile pages are max 25. Follow tokens inside the tool
+	// so a multi-night window is one agent call (8 pages ≈ 200 sessions).
+	resp, err := c.reconcilePages(ctx, reconcileOpts{
 		DataType:      DataTypeSleep,
 		Filter:        filter,
 		PageSize:      25,
 		WearablesOnly: c.wearables(),
-	})
+	}, 8)
 	if err != nil {
 		return nil, err
 	}
-	points := make([]map[string]any, 0, len(resp.DataPoints))
-	for _, raw := range resp.DataPoints {
-		m, err := decodeDataPoint(raw)
-		if err != nil {
-			continue
-		}
-		points = append(points, m)
+	sessions := mapSleepSessions(decodePoints(resp.DataPoints))
+	note := sleepAPINote
+	if resp.NextPageToken != "" {
+		note = "truncated; narrow after_date/before_date. " + note
 	}
-	return pickMainSleep(points, day), nil
+	if len(sessions) == 0 {
+		return &SleepListResult{
+			Sessions: []SleepResult{},
+			Count:    0,
+			Note:     "no sleep sessions in range. " + note,
+		}, nil
+	}
+	return &SleepListResult{Sessions: sessions, Count: len(sessions), Note: note}, nil
 }
 
 func (c *Client) ActivitiesList(ctx context.Context, req ActivitiesListRequest) (*ActivitiesListResult, error) {
@@ -163,52 +169,38 @@ func (c *Client) ActivitiesGet(ctx context.Context, id string) (*Activity, error
 	return &a, nil
 }
 
-func (c *Client) HeartRateGet(ctx context.Context, req HeartRateRequest) (*HeartRateResult, error) {
-	filter, day, err := filterDailyDate("daily_resting_heart_rate", req.Date, nowFn())
+func (c *Client) HeartRateGet(ctx context.Context, req HeartRateRequest) (*HeartRateListResult, error) {
+	filter, err := filterDailyWindow("daily_resting_heart_rate", req.Date, req.AfterDate, req.BeforeDate, nowFn())
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.reconcileDataPoints(ctx, reconcileOpts{
+	resp, err := c.reconcilePages(ctx, reconcileOpts{
 		DataType:      DataTypeDailyRestingHeartRate,
 		Filter:        filter,
-		PageSize:      10,
+		PageSize:      500,
 		WearablesOnly: c.wearables(),
-	})
+	}, 3)
 	if err != nil {
 		return nil, err
 	}
-	if len(resp.DataPoints) == 0 {
-		return &HeartRateResult{Date: day.String(), Note: "no daily resting heart rate for day"}, nil
-	}
-	m, err := decodeDataPoint(resp.DataPoints[0])
-	if err != nil {
-		return nil, err
-	}
-	return mapRestingHR(m, day), nil
+	return mapRestingHRList(decodePoints(resp.DataPoints), resp.NextPageToken != ""), nil
 }
 
-func (c *Client) HRVGet(ctx context.Context, req HRVRequest) (*HRVResult, error) {
-	filter, day, err := filterDailyDate("daily_heart_rate_variability", req.Date, nowFn())
+func (c *Client) HRVGet(ctx context.Context, req HRVRequest) (*HRVListResult, error) {
+	filter, err := filterDailyWindow("daily_heart_rate_variability", req.Date, req.AfterDate, req.BeforeDate, nowFn())
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.reconcileDataPoints(ctx, reconcileOpts{
+	resp, err := c.reconcilePages(ctx, reconcileOpts{
 		DataType:      DataTypeDailyHeartRateVariability,
 		Filter:        filter,
-		PageSize:      10,
+		PageSize:      500,
 		WearablesOnly: c.wearables(),
-	})
+	}, 3)
 	if err != nil {
 		return nil, err
 	}
-	if len(resp.DataPoints) == 0 {
-		return &HRVResult{Date: day.String(), Note: "no daily HRV for day"}, nil
-	}
-	m, err := decodeDataPoint(resp.DataPoints[0])
-	if err != nil {
-		return nil, err
-	}
-	return mapHRV(m, day), nil
+	return mapHRVList(decodePoints(resp.DataPoints), resp.NextPageToken != ""), nil
 }
 
 func (c *Client) WeightGet(ctx context.Context, req WeightRequest) (*WeightResult, error) {
@@ -216,26 +208,22 @@ func (c *Client) WeightGet(ctx context.Context, req WeightRequest) (*WeightResul
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.reconcileDataPoints(ctx, reconcileOpts{
+	resp, err := c.reconcilePages(ctx, reconcileOpts{
 		DataType:      DataTypeWeight,
 		Filter:        filter,
 		PageSize:      100,
 		WearablesOnly: false, // scales are often google-sources / manual
-	})
+	}, 10)
 	if err != nil {
 		return nil, err
 	}
-	points := make([]map[string]any, 0, len(resp.DataPoints))
-	for _, raw := range resp.DataPoints {
-		m, err := decodeDataPoint(raw)
-		if err != nil {
-			continue
-		}
-		points = append(points, m)
+	note := "weight via dataPoints:reconcile"
+	if resp.NextPageToken != "" {
+		note = "truncated; use a shorter period. " + note
 	}
 	return &WeightResult{
-		Entries: mapWeightEntries(points),
-		Note:    "weight via dataPoints:reconcile",
+		Entries: mapWeightEntries(decodePoints(resp.DataPoints)),
+		Note:    note,
 	}, nil
 }
 

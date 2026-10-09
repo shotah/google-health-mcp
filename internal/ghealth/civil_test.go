@@ -59,6 +59,38 @@ func TestFilterDailyDate(t *testing.T) {
 	}
 }
 
+func TestFilterSleepWindowRange(t *testing.T) {
+	now := time.Date(2026, 8, 10, 12, 0, 0, 0, time.Local)
+	f, err := filterSleepWindow("", "2026-08-01", "2026-08-08", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(f, `civil_end_time >= "2026-08-01"`) || !strings.Contains(f, `civil_end_time < "2026-08-08"`) {
+		t.Fatalf("%q", f)
+	}
+	if _, err := filterSleepWindow("", "2026-08-08", "2026-08-01", now); err == nil {
+		t.Fatal("expected inverted range error")
+	}
+}
+
+func TestFilterDailyWindowRange(t *testing.T) {
+	now := time.Date(2026, 8, 10, 12, 0, 0, 0, time.Local)
+	f, err := filterDailyWindow("daily_resting_heart_rate", "", "2026-08-01", "2026-08-08", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(f, "date(2026, 8, 1)") || !strings.Contains(f, "date(2026, 8, 8)") {
+		t.Fatalf("%q", f)
+	}
+	one, err := filterDailyWindow("daily_heart_rate_variability", "2026-08-03", "", "", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(one, "date = date(2026, 8, 3)") {
+		t.Fatalf("%q", one)
+	}
+}
+
 func TestFilterWeightPeriod(t *testing.T) {
 	now := time.Date(2026, 8, 3, 12, 0, 0, 0, time.Local)
 	f, err := filterWeightPeriod("2026-08-03", "1m", now)

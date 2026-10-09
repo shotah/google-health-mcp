@@ -7,8 +7,12 @@ type Stub struct{}
 
 func NewStub() *Stub { return &Stub{} }
 
-func (Stub) SleepGet(_ context.Context, req SleepGetRequest) (*SleepResult, error) {
-	return &SleepResult{Date: req.Date, Note: "stub client"}, nil
+func (Stub) SleepGet(_ context.Context, req SleepGetRequest) (*SleepListResult, error) {
+	return &SleepListResult{
+		Sessions: []SleepResult{{Date: req.Date, Note: "stub client"}},
+		Count:    1,
+		Note:     sleepAPINote,
+	}, nil
 }
 
 func (Stub) ActivitiesList(_ context.Context, _ ActivitiesListRequest) (*ActivitiesListResult, error) {
@@ -19,12 +23,18 @@ func (Stub) ActivitiesGet(_ context.Context, id string) (*Activity, error) {
 	return &Activity{ID: id, Name: "stub activity"}, nil
 }
 
-func (Stub) HeartRateGet(_ context.Context, req HeartRateRequest) (*HeartRateResult, error) {
-	return &HeartRateResult{Date: req.Date, Note: "stub client"}, nil
+func (Stub) HeartRateGet(_ context.Context, req HeartRateRequest) (*HeartRateListResult, error) {
+	return &HeartRateListResult{
+		Entries: []HeartRateResult{{Date: req.Date, Note: "stub client"}},
+		Count:   1,
+	}, nil
 }
 
-func (Stub) HRVGet(_ context.Context, req HRVRequest) (*HRVResult, error) {
-	return &HRVResult{Date: req.Date, Note: "stub client"}, nil
+func (Stub) HRVGet(_ context.Context, req HRVRequest) (*HRVListResult, error) {
+	return &HRVListResult{
+		Entries: []HRVResult{{Date: req.Date, Note: "stub client"}},
+		Count:   1,
+	}, nil
 }
 
 func (Stub) WeightGet(_ context.Context, _ WeightRequest) (*WeightResult, error) {

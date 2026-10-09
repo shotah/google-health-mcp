@@ -102,6 +102,81 @@ func filterDailyDate(fieldPrefix, date string, now time.Time) (string, CivilDate
 	return f, day, nil
 }
 
+// dateWindow is an exclusive-end civil range. openStart means no lower bound.
+type dateWindow struct {
+	start     CivilDate
+	end       CivilDate
+	openStart bool
+}
+
+// resolveRange parses after (inclusive) / before (exclusive).
+// An empty before runs through the start of tomorrow so today is included.
+func resolveRange(after, before string, now time.Time) (dateWindow, error) {
+	w := dateWindow{}
+	var err error
+	if strings.TrimSpace(after) == "" {
+		w.openStart = true
+	} else {
+		w.start, err = ParseCivilDate(after)
+		if err != nil {
+			return dateWindow{}, err
+		}
+	}
+	if strings.TrimSpace(before) == "" {
+		w.end = TodayCivil(now).AddDays(1)
+	} else {
+		w.end, err = ParseCivilDate(before)
+		if err != nil {
+			return dateWindow{}, err
+		}
+	}
+	if !w.openStart && w.end.String() <= w.start.String() {
+		return dateWindow{}, fmt.Errorf("before_date %s must be after after_date %s", w.end.String(), w.start.String())
+	}
+	return w, nil
+}
+
+func rangeRequested(after, before string) bool {
+	return strings.TrimSpace(after) != "" || strings.TrimSpace(before) != ""
+}
+
+// filterSleepWindow filters sleep sessions by civil wake-up day.
+// A single Date (or today) stays one day. after/before select the span.
+func filterSleepWindow(date, after, before string, now time.Time) (string, error) {
+	if !rangeRequested(after, before) {
+		f, _, err := filterDaySession("sleep", date, now)
+		return f, err
+	}
+	w, err := resolveRange(after, before, now)
+	if err != nil {
+		return "", err
+	}
+	var parts []string
+	if !w.openStart {
+		parts = append(parts, fmt.Sprintf(`sleep.interval.civil_end_time >= %q`, w.start.String()))
+	}
+	parts = append(parts, fmt.Sprintf(`sleep.interval.civil_end_time < %q`, w.end.String()))
+	return strings.Join(parts, " AND "), nil
+}
+
+// filterDailyWindow filters a daily rollup for one day or an exclusive-end span.
+func filterDailyWindow(fieldPrefix, date, after, before string, now time.Time) (string, error) {
+	if !rangeRequested(after, before) {
+		f, _, err := filterDailyDate(fieldPrefix, date, now)
+		return f, err
+	}
+	w, err := resolveRange(after, before, now)
+	if err != nil {
+		return "", err
+	}
+	var parts []string
+	if !w.openStart {
+		parts = append(parts, fmt.Sprintf(`%s.date >= date(%d, %d, %d)`, fieldPrefix, w.start.Year, int(w.start.Month), w.start.Day))
+	}
+	parts = append(parts, fmt.Sprintf(`%s.date < date(%d, %d, %d)`, fieldPrefix, w.end.Year, int(w.end.Month), w.end.Day))
+	return strings.Join(parts, " AND "), nil
+}
+
 // filterWeightPeriod maps garmin-style period (1m/3m) onto civil sample dates.
 func filterWeightPeriod(baseDate, period string, now time.Time) (string, error) {
 	end := TodayCivil(now)
@@ -159,22 +234,33 @@ func parseDurationSeconds(s string) float64 {
 }
 
 func parseFloatish(v any) float64 {
+	f, ok := parseFloatishPresent(v)
+	if !ok {
+		return 0
+	}
+	return f
+}
+
+func parseFloatishPresent(v any) (float64, bool) {
 	switch x := v.(type) {
 	case float64:
-		return x
+		return x, true
 	case float32:
-		return float64(x)
+		return float64(x), true
 	case int:
-		return float64(x)
+		return float64(x), true
 	case int64:
-		return float64(x)
+		return float64(x), true
 	case json.Number:
-		f, _ := x.Float64()
-		return f
+		f, err := x.Float64()
+		return f, err == nil
 	case string:
-		f, _ := strconv.ParseFloat(x, 64)
-		return f
+		if strings.TrimSpace(x) == "" {
+			return 0, false
+		}
+		f, err := strconv.ParseFloat(x, 64)
+		return f, err == nil
 	default:
-		return 0
+		return 0, false
 	}
 }

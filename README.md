@@ -60,9 +60,17 @@ Host: `ghealth__sleep_get`, `ghealth__activities_list`, …
 
 ```text
 sleep_get / heart_rate_get / hrv_get  → recovery
+  last night / today: omit date
+  a span: after_date + before_date once (sessions[] / entries[])
 activities_list → activities_get     → “what did I do?”
-weight_get                           → scale
+weight_get                           → scale (period already a series)
 ```
+
+The Google Health app’s 0–100 Sleep Score is **not** on `dataTypes/sleep`
+(no `sleep-score` data type either). `sleep_get` returns the session the API
+does expose: duration, `stages_minutes`, and `efficiency`
+(`round(minutes asleep / minutes in the sleep period × 100)`). It does not
+invent a score.
 
 Same recipes as `garmin__…` — swap prefix for Fitbit friends.
 

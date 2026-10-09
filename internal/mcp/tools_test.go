@@ -112,7 +112,7 @@ func TestToolsNilClient(t *testing.T) {
 
 type errClient struct{ ghealth.Stub }
 
-func (errClient) SleepGet(_ context.Context, _ ghealth.SleepGetRequest) (*ghealth.SleepResult, error) {
+func (errClient) SleepGet(_ context.Context, _ ghealth.SleepGetRequest) (*ghealth.SleepListResult, error) {
 	return nil, errors.New("boom")
 }
 

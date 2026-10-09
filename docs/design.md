@@ -49,7 +49,10 @@ Shared nouns with garmin — **host prefix** disambiguates
 Default date behavior matches garmin recipes:
 
 - “Last night’s sleep” → omit date or pass **today** (wake-up day)
+- A span of sleep, resting HR, or HRV → `after_date` (inclusive) + `before_date` (exclusive) in **one** call; read `sessions[]` / `entries[]`
 - Activity day bounds in the human’s timezone from `[current time]`
+
+The app Sleep Score (0–100) is not a field on `sleep`. `sleep_get` returns duration, stage minutes, and `efficiency` (`round(minutes asleep / minutes in the sleep period × 100)`). It does not invent a score.
 
 ## Auth
 

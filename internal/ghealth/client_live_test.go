@@ -42,11 +42,18 @@ func TestSleepGetReconcile(t *testing.T) {
 							"startTime": "2026-08-02T22:00:00Z",
 							"endTime":   "2026-08-03T06:00:00Z",
 						},
-						"metadata": map[string]any{"main": true, "processed": true},
+						"metadata": map[string]any{"mainSleep": true, "processed": true},
 						"summary": map[string]any{
 							"minutesAsleep":        "420",
 							"minutesInSleepPeriod": "480",
 							"minutesAwake":         "60",
+							"minutesToFallAsleep":  "12",
+							"stagesSummary": []any{
+								map[string]any{"type": "DEEP", "minutes": "90"},
+								map[string]any{"type": "LIGHT", "minutes": "210"},
+								map[string]any{"type": "REM", "minutes": "120"},
+								map[string]any{"type": "AWAKE", "minutes": "60"},
+							},
 						},
 					},
 				},
@@ -57,11 +64,130 @@ func TestSleepGetReconcile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.DurationMinutes != 420 {
-		t.Fatalf("duration %#v", res)
+	if res.Count != 1 || len(res.Sessions) != 1 {
+		t.Fatalf("count %#v", res)
 	}
-	if res.Efficiency < 87 || res.Efficiency > 88 {
-		t.Fatalf("efficiency %v", res.Efficiency)
+	session := res.Sessions[0]
+	if session.DurationMinutes != 420 || !session.Main {
+		t.Fatalf("session %#v", session)
+	}
+	if session.Efficiency != 88 {
+		t.Fatalf("efficiency %v", session.Efficiency)
+	}
+	if session.StagesMinutes["deep"] != 90 || session.MinutesToFallAsleep != 12 {
+		t.Fatalf("stages %#v", session)
+	}
+	if session.SleepScore != nil {
+		t.Fatalf("score should be absent: %#v", session.SleepScore)
+	}
+	if !strings.Contains(res.Note, "does not return the app Sleep Score") {
+		t.Fatalf("note %q", res.Note)
+	}
+}
+
+func TestSleepRangePagesAndScore(t *testing.T) {
+	var calls int
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		q := r.URL.Query().Get("filter")
+		if !strings.Contains(q, `civil_end_time >= "2026-08-01"`) || !strings.Contains(q, `civil_end_time < "2026-08-04"`) {
+			t.Fatalf("filter %q", q)
+		}
+		if calls == 1 {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"nextPageToken": "page-2",
+				"dataPoints": []map[string]any{{
+					"dataPointName": "users/me/dataTypes/sleep/dataPoints/nap",
+					"sleep": map[string]any{
+						"interval": map[string]any{
+							"endTime": "2026-08-02T18:00:00Z",
+							"civilEndTime": map[string]any{
+								"date": map[string]any{"year": 2026, "month": 8, "day": 2},
+							},
+						},
+						"metadata": map[string]any{"nap": true},
+						"summary":  map[string]any{"minutesAsleep": "40", "minutesInSleepPeriod": "45"},
+					},
+				}},
+			})
+			return
+		}
+		if r.URL.Query().Get("pageToken") != "page-2" {
+			t.Fatalf("page token %q", r.URL.Query().Get("pageToken"))
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"dataPoints": []map[string]any{{
+				"dataPointName": "users/me/dataTypes/sleep/dataPoints/main",
+				"sleep": map[string]any{
+					"interval": map[string]any{
+						"endTime": "2026-08-03T14:00:00Z",
+						"civilEndTime": map[string]any{
+							"date": map[string]any{"year": 2026, "month": 8, "day": 3},
+						},
+					},
+					"metadata": map[string]any{"mainSleep": true},
+					"summary": map[string]any{
+						"minutesAsleep":        "400",
+						"minutesInSleepPeriod": "450",
+						"sleepScore":           "81",
+					},
+				},
+			}},
+		})
+	})
+	res, err := c.SleepGet(t.Context(), SleepGetRequest{AfterDate: "2026-08-01", BeforeDate: "2026-08-04"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 || res.Count != 2 {
+		t.Fatalf("calls %d %#v", calls, res)
+	}
+	if res.Sessions[0].Date != "2026-08-02" || !res.Sessions[0].Nap || res.Sessions[0].Main {
+		t.Fatalf("first %#v", res.Sessions[0])
+	}
+	if res.Sessions[1].Date != "2026-08-03" || !res.Sessions[1].Main || res.Sessions[1].SleepScore == nil || *res.Sessions[1].SleepScore != 81 {
+		t.Fatalf("second %#v", res.Sessions[1])
+	}
+}
+
+func TestDailyRange(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query().Get("filter")
+		if !strings.Contains(q, "date >= date(2026, 8, 1)") || !strings.Contains(q, "date < date(2026, 8, 4)") {
+			t.Fatalf("filter %q", q)
+		}
+		switch {
+		case strings.Contains(r.URL.Path, "daily-resting-heart-rate"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"dataPoints": []map[string]any{
+					{"dailyRestingHeartRate": map[string]any{"date": map[string]any{"year": 2026, "month": 8, "day": 3}, "beatsPerMinute": "55"}},
+					{"dailyRestingHeartRate": map[string]any{"date": map[string]any{"year": 2026, "month": 8, "day": 1}, "beatsPerMinute": "52"}},
+				},
+			})
+		case strings.Contains(r.URL.Path, "daily-heart-rate-variability"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"dataPoints": []map[string]any{
+					{"dailyHeartRateVariability": map[string]any{"date": map[string]any{"year": 2026, "month": 8, "day": 2}, "averageHeartRateVariabilityMilliseconds": 40}},
+					{"dailyHeartRateVariability": map[string]any{"date": map[string]any{"year": 2026, "month": 8, "day": 1}, "deepSleepRootMeanSquareOfSuccessiveDifferencesMilliseconds": 38}},
+				},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	hr, err := c.HeartRateGet(t.Context(), HeartRateRequest{AfterDate: "2026-08-01", BeforeDate: "2026-08-04"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hr.Count != 2 || hr.Entries[0].Date != "2026-08-01" || hr.Entries[0].RestingHR != 52 || hr.Entries[1].RestingHR != 55 {
+		t.Fatalf("%#v", hr)
+	}
+	hrv, err := c.HRVGet(t.Context(), HRVRequest{AfterDate: "2026-08-01", BeforeDate: "2026-08-04"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hrv.Count != 2 || hrv.Entries[0].RMSSD != 38 || hrv.Entries[1].RMSSD != 40 {
+		t.Fatalf("%#v", hrv)
 	}
 }
 
@@ -150,14 +276,14 @@ func TestHeartRateAndHRV(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hr.RestingHR != 54 {
+	if hr.Count != 1 || hr.Entries[0].RestingHR != 54 {
 		t.Fatalf("%#v", hr)
 	}
 	hrv, err := c.HRVGet(t.Context(), HRVRequest{Date: "2026-08-03"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hrv.RMSSD != 42.5 {
+	if hrv.Count != 1 || hrv.Entries[0].RMSSD != 42.5 {
 		t.Fatalf("%#v", hrv)
 	}
 }
@@ -221,14 +347,14 @@ func TestEmptyDailyResults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(hr.Note, "no daily") {
+	if hr.Count != 0 || !strings.Contains(hr.Note, "no daily") {
 		t.Fatalf("%#v", hr)
 	}
 	hrv, err := c.HRVGet(t.Context(), HRVRequest{Date: "2026-08-03"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(hrv.Note, "no daily") {
+	if hrv.Count != 0 || !strings.Contains(hrv.Note, "no daily") {
 		t.Fatalf("%#v", hrv)
 	}
 }

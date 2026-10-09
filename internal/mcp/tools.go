@@ -10,7 +10,9 @@ import (
 )
 
 type sleepGetInput struct {
-	Date string `json:"date,omitempty" jsonschema:"YYYY-MM-DD; omit or pass today for last night (wake-up day)"`
+	Date       string `json:"date,omitempty" jsonschema:"One wake-up day YYYY-MM-DD. Omit for last night. Ignored when after_date or before_date is set."`
+	AfterDate  string `json:"after_date,omitempty" jsonschema:"Inclusive wake-up day YYYY-MM-DD. Use with before_date to fetch many nights in one call."`
+	BeforeDate string `json:"before_date,omitempty" jsonschema:"Exclusive wake-up day YYYY-MM-DD end bound."`
 }
 
 type activitiesListInput struct {
@@ -25,11 +27,15 @@ type activitiesGetInput struct {
 }
 
 type heartRateGetInput struct {
-	Date string `json:"date,omitempty" jsonschema:"YYYY-MM-DD (default today)"`
+	Date       string `json:"date,omitempty" jsonschema:"YYYY-MM-DD (default today). Ignored when after_date or before_date is set."`
+	AfterDate  string `json:"after_date,omitempty" jsonschema:"Inclusive start YYYY-MM-DD. One call for the whole span."`
+	BeforeDate string `json:"before_date,omitempty" jsonschema:"Exclusive end YYYY-MM-DD."`
 }
 
 type hrvGetInput struct {
-	Date string `json:"date,omitempty" jsonschema:"YYYY-MM-DD (default today)"`
+	Date       string `json:"date,omitempty" jsonschema:"YYYY-MM-DD (default today). Ignored when after_date or before_date is set."`
+	AfterDate  string `json:"after_date,omitempty" jsonschema:"Inclusive start YYYY-MM-DD. One call for the whole span."`
+	BeforeDate string `json:"before_date,omitempty" jsonschema:"Exclusive end YYYY-MM-DD."`
 }
 
 type weightGetInput struct {
@@ -45,7 +51,11 @@ func (s *Server) sleepGet(ctx context.Context, _ *sdkmcp.CallToolRequest, in sle
 	if s.Client == nil {
 		return errResult("client not configured"), nil, nil
 	}
-	res, err := s.Client.SleepGet(ctx, ghealth.SleepGetRequest{Date: in.Date})
+	res, err := s.Client.SleepGet(ctx, ghealth.SleepGetRequest{
+		Date:       in.Date,
+		AfterDate:  in.AfterDate,
+		BeforeDate: in.BeforeDate,
+	})
 	if err != nil {
 		return errResult(err.Error()), nil, nil
 	}
@@ -86,7 +96,11 @@ func (s *Server) heartRateGet(ctx context.Context, _ *sdkmcp.CallToolRequest, in
 	if s.Client == nil {
 		return errResult("client not configured"), nil, nil
 	}
-	res, err := s.Client.HeartRateGet(ctx, ghealth.HeartRateRequest{Date: in.Date})
+	res, err := s.Client.HeartRateGet(ctx, ghealth.HeartRateRequest{
+		Date:       in.Date,
+		AfterDate:  in.AfterDate,
+		BeforeDate: in.BeforeDate,
+	})
 	if err != nil {
 		return errResult(err.Error()), nil, nil
 	}
@@ -97,7 +111,11 @@ func (s *Server) hrvGet(ctx context.Context, _ *sdkmcp.CallToolRequest, in hrvGe
 	if s.Client == nil {
 		return errResult("client not configured"), nil, nil
 	}
-	res, err := s.Client.HRVGet(ctx, ghealth.HRVRequest{Date: in.Date})
+	res, err := s.Client.HRVGet(ctx, ghealth.HRVRequest{
+		Date:       in.Date,
+		AfterDate:  in.AfterDate,
+		BeforeDate: in.BeforeDate,
+	})
 	if err != nil {
 		return errResult(err.Error()), nil, nil
 	}

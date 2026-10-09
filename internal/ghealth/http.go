@@ -100,6 +100,42 @@ func (c *Client) reconcileDataPoints(ctx context.Context, opts reconcileOpts) (*
 	return &out, nil
 }
 
+// reconcilePages follows nextPageToken so one tool call covers a date span.
+// Sleep and exercise pages are capped at 25 by the API. The leftover token is
+// set when maxPages is exhausted before the window is done.
+func (c *Client) reconcilePages(ctx context.Context, opts reconcileOpts, maxPages int) (*dataPointsResponse, error) {
+	if maxPages < 1 {
+		maxPages = 1
+	}
+	combined := &dataPointsResponse{}
+	for range maxPages {
+		resp, err := c.reconcileDataPoints(ctx, opts)
+		if err != nil {
+			return nil, err
+		}
+		combined.DataPoints = append(combined.DataPoints, resp.DataPoints...)
+		if len(resp.DataPoints) == 0 || resp.NextPageToken == "" {
+			combined.NextPageToken = ""
+			return combined, nil
+		}
+		opts.PageToken = resp.NextPageToken
+		combined.NextPageToken = resp.NextPageToken
+	}
+	return combined, nil
+}
+
+func decodePoints(raw []json.RawMessage) []map[string]any {
+	points := make([]map[string]any, 0, len(raw))
+	for _, item := range raw {
+		m, err := decodeDataPoint(item)
+		if err != nil {
+			continue
+		}
+		points = append(points, m)
+	}
+	return points
+}
+
 func (c *Client) getDataPoint(ctx context.Context, name string) (map[string]any, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {

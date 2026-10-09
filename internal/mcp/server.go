@@ -21,11 +21,11 @@ var ServerVersion = "dev"
 
 // HealthAPI is the Google Health surface used by tools (mockable in tests).
 type HealthAPI interface {
-	SleepGet(ctx context.Context, req ghealth.SleepGetRequest) (*ghealth.SleepResult, error)
+	SleepGet(ctx context.Context, req ghealth.SleepGetRequest) (*ghealth.SleepListResult, error)
 	ActivitiesList(ctx context.Context, req ghealth.ActivitiesListRequest) (*ghealth.ActivitiesListResult, error)
 	ActivitiesGet(ctx context.Context, id string) (*ghealth.Activity, error)
-	HeartRateGet(ctx context.Context, req ghealth.HeartRateRequest) (*ghealth.HeartRateResult, error)
-	HRVGet(ctx context.Context, req ghealth.HRVRequest) (*ghealth.HRVResult, error)
+	HeartRateGet(ctx context.Context, req ghealth.HeartRateRequest) (*ghealth.HeartRateListResult, error)
+	HRVGet(ctx context.Context, req ghealth.HRVRequest) (*ghealth.HRVListResult, error)
 	WeightGet(ctx context.Context, req ghealth.WeightRequest) (*ghealth.WeightResult, error)
 	ProfileGet(ctx context.Context) (*ghealth.Profile, error)
 	AccountStatus() map[string]any
@@ -67,15 +67,20 @@ func (s *Server) newMCPServer() *sdkmcp.Server {
 
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name: "sleep_get",
-		Description: "Get Google Health sleep (Fitbit / Pixel Watch) for a calendar day via reconcile. " +
-			"For “last night”, omit date or pass today (wake-up day), matching garmin__sleep_get recipes. " +
-			"Does not invent sleep scores.",
+		Description: "Get Google Health sleep sessions (Fitbit / Pixel Watch) via reconcile. " +
+			"Omit dates for last night (wake-up day is today). " +
+			"For several nights pass after_date (inclusive) and before_date (exclusive) once — do not call once per day. " +
+			"Read sessions[]: duration_minutes, efficiency, stages_minutes, minutes_to_fall_asleep, minutes_awake. " +
+			"The Google Health app Sleep Score (0-100) is not in the API; do not invent one. " +
+			"efficiency is round(minutes asleep / minutes in the sleep period * 100).",
 	}, s.sleepGet)
 
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name: "activities_list",
 		Description: "List recent Google Health exercises (dataTypes/exercise) in a date window. " +
 			"Call this first for “what did I do?”, then activities_get for detail. " +
+			"Pass after_date and before_date once for the whole window. " +
+			"Exercise pages are 25; if next_page_token is set, call again with page_token. " +
 			"Bound days in the human’s timezone.",
 	}, s.activitiesList)
 
@@ -87,14 +92,15 @@ func (s *Server) newMCPServer() *sdkmcp.Server {
 
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name: "heart_rate_get",
-		Description: "Get daily resting heart rate (and related HR context) from Google Health. " +
-			"Use for recovery alongside sleep_get and hrv_get.",
+		Description: "Get daily resting heart rate from Google Health. " +
+			"Omit date for today. For a span, pass after_date (inclusive) and before_date (exclusive) once and read entries[] — do not call once per day. " +
+			"Use with sleep_get and hrv_get for recovery.",
 	}, s.heartRateGet)
 
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name: "hrv_get",
 		Description: "Get daily heart-rate variability when the wearable recorded it. " +
-			"Prefer this (not inventing readiness) for recovery questions.",
+			"Omit date for today. For a span, pass after_date (inclusive) and before_date (exclusive) once and read entries[] — do not call once per day.",
 	}, s.hrvGet)
 
 	sdkmcp.AddTool(server, &sdkmcp.Tool{

@@ -1,66 +1,129 @@
 package ghealth
 
 import (
+	"math"
 	"path"
+	"sort"
 	"strings"
 	"time"
 )
 
-func mapSleep(m map[string]any, civilDay CivilDate) *SleepResult {
+// sleepAPINote tells the agent the app score is not on this data type.
+const sleepAPINote = "Google Health does not return the app Sleep Score (0-100). efficiency is round(minutes asleep / minutes in the sleep period * 100). stages_minutes are deep, light, rem, and awake."
+
+var sleepScoreKeys = []string{"sleepScore", "sleep_score", "score"}
+
+func mapSleep(m map[string]any) (SleepResult, bool) {
 	sleep := asMap(m["sleep"])
 	if sleep == nil {
-		return &SleepResult{Date: civilDay.String(), Note: "no sleep payload", Raw: m}
+		return SleepResult{}, false
 	}
 	interval := asMap(sleep["interval"])
 	summary := asMap(sleep["summary"])
-	start := strField(interval, "startTime")
-	end := strField(interval, "endTime")
+	meta := asMap(sleep["metadata"])
 	minsAsleep := parseFloatish(summary["minutesAsleep"])
 	minsInBed := parseFloatish(summary["minutesInSleepPeriod"])
 	efficiency := 0.0
 	if minsInBed > 0 && minsAsleep > 0 {
-		efficiency = (minsAsleep / minsInBed) * 100
+		efficiency = math.Round((minsAsleep / minsInBed) * 100)
 	}
-	date := civilDay.String()
-	if end != "" {
-		if t, err := time.Parse(time.RFC3339, end); err == nil {
-			// Wake-up civil day in local TZ when caller omitted a date.
-			date = t.In(time.Local).Format("2006-01-02")
-		}
+	res := SleepResult{
+		Date:                 sessionWakeDay(interval),
+		Main:                 isMainSleep(meta),
+		Nap:                  boolField(meta, "nap"),
+		DurationMinutes:      minsAsleep,
+		Efficiency:           efficiency,
+		MinutesAwake:         parseFloatish(summary["minutesAwake"]),
+		MinutesInSleepPeriod: minsInBed,
+		MinutesToFallAsleep:  parseFloatish(summary["minutesToFallAsleep"]),
+		MinutesAfterWakeup:   parseFloatish(summary["minutesAfterWakeUp"]),
+		StagesMinutes:        mapStageMinutes(summary),
+		StartTime:            strField(interval, "startTime"),
+		EndTime:              strField(interval, "endTime"),
+		DataPointName:        dataPointName(m),
 	}
-	return &SleepResult{
-		Date:            date,
-		DurationMinutes: minsAsleep,
-		Efficiency:      efficiency,
-		StartTime:       start,
-		EndTime:         end,
-		DataPointName:   dataPointName(m),
-		Raw:             m,
+	if score, ok := lookupSleepScore(summary, sleep); ok {
+		res.SleepScore = &score
 	}
+	return res, true
 }
 
-func pickMainSleep(points []map[string]any, day CivilDate) *SleepResult {
-	if len(points) == 0 {
-		return &SleepResult{Date: day.String(), Note: "no sleep data points for day"}
-	}
-	var best map[string]any
-	var bestMins float64
+func mapSleepSessions(points []map[string]any) []SleepResult {
+	out := make([]SleepResult, 0, len(points))
 	for _, p := range points {
-		sleep := asMap(p["sleep"])
-		meta := asMap(sleep["metadata"])
-		summary := asMap(sleep["summary"])
-		mins := parseFloatish(summary["minutesAsleep"])
-		if meta != nil {
-			if main, ok := meta["main"].(bool); ok && main {
-				return mapSleep(p, day)
+		session, ok := mapSleep(p)
+		if !ok {
+			continue
+		}
+		out = append(out, session)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Date != out[j].Date {
+			return out[i].Date < out[j].Date
+		}
+		return out[i].EndTime < out[j].EndTime
+	})
+	return out
+}
+
+func sessionWakeDay(interval map[string]any) string {
+	if civil := asMap(interval["civilEndTime"]); civil != nil {
+		if d := formatAPIDate(asMap(civil["date"])); d != "" {
+			return d
+		}
+	}
+	if end := strField(interval, "endTime"); end != "" {
+		if t, err := time.Parse(time.RFC3339, end); err == nil {
+			return t.In(time.Local).Format("2006-01-02")
+		}
+	}
+	return ""
+}
+
+func isMainSleep(meta map[string]any) bool {
+	return boolField(meta, "mainSleep") || boolField(meta, "main")
+}
+
+func boolField(m map[string]any, key string) bool {
+	if m == nil {
+		return false
+	}
+	b, ok := m[key].(bool)
+	return ok && b
+}
+
+func lookupSleepScore(objs ...map[string]any) (float64, bool) {
+	for _, m := range objs {
+		if m == nil {
+			continue
+		}
+		for _, key := range sleepScoreKeys {
+			if f, ok := parseFloatishPresent(m[key]); ok {
+				return f, true
 			}
 		}
-		if best == nil || mins > bestMins {
-			best = p
-			bestMins = mins
-		}
 	}
-	return mapSleep(best, day)
+	return 0, false
+}
+
+func mapStageMinutes(summary map[string]any) map[string]float64 {
+	raw, ok := summary["stagesSummary"].([]any)
+	if !ok || len(raw) == 0 {
+		return nil
+	}
+	out := make(map[string]float64, len(raw))
+	for _, item := range raw {
+		stage := asMap(item)
+		typ := strings.ToLower(strField(stage, "type"))
+		if typ == "" {
+			continue
+		}
+		out[typ] = parseFloatish(stage["minutes"])
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func mapExercise(m map[string]any) Activity {
@@ -96,36 +159,54 @@ func mapExercise(m map[string]any) Activity {
 	}
 }
 
-func mapRestingHR(m map[string]any, day CivilDate) *HeartRateResult {
-	dr := asMap(m["dailyRestingHeartRate"])
-	bpm := parseFloatish(dr["beatsPerMinute"])
-	date := day.String()
-	if d := asMap(dr["date"]); d != nil {
-		date = formatAPIDate(d)
+func mapRestingHRList(points []map[string]any, truncated bool) *HeartRateListResult {
+	entries := make([]HeartRateResult, 0, len(points))
+	for _, m := range points {
+		dr := asMap(m["dailyRestingHeartRate"])
+		if dr == nil {
+			continue
+		}
+		entries = append(entries, HeartRateResult{
+			Date:      formatAPIDate(asMap(dr["date"])),
+			RestingHR: parseFloatish(dr["beatsPerMinute"]),
+		})
 	}
-	return &HeartRateResult{
-		Date:      date,
-		RestingHR: bpm,
-		Note:      "daily-resting-heart-rate via reconcile",
+	sort.SliceStable(entries, func(i, j int) bool { return entries[i].Date < entries[j].Date })
+	note := "daily-resting-heart-rate via reconcile"
+	if len(entries) == 0 {
+		note = "no daily resting heart rate in range"
 	}
+	if truncated {
+		note = "truncated; narrow after_date/before_date. " + note
+	}
+	return &HeartRateListResult{Entries: entries, Count: len(entries), Note: note}
 }
 
-func mapHRV(m map[string]any, day CivilDate) *HRVResult {
-	h := asMap(m["dailyHeartRateVariability"])
-	rmssd := parseFloatish(h["averageHeartRateVariabilityMilliseconds"])
-	if rmssd == 0 {
-		rmssd = parseFloatish(h["deepSleepRootMeanSquareOfSuccessiveDifferencesMilliseconds"])
+func mapHRVList(points []map[string]any, truncated bool) *HRVListResult {
+	entries := make([]HRVResult, 0, len(points))
+	for _, m := range points {
+		h := asMap(m["dailyHeartRateVariability"])
+		if h == nil {
+			continue
+		}
+		rmssd := parseFloatish(h["averageHeartRateVariabilityMilliseconds"])
+		if rmssd == 0 {
+			rmssd = parseFloatish(h["deepSleepRootMeanSquareOfSuccessiveDifferencesMilliseconds"])
+		}
+		entries = append(entries, HRVResult{
+			Date:  formatAPIDate(asMap(h["date"])),
+			RMSSD: rmssd,
+		})
 	}
-	date := day.String()
-	if d := asMap(h["date"]); d != nil {
-		date = formatAPIDate(d)
+	sort.SliceStable(entries, func(i, j int) bool { return entries[i].Date < entries[j].Date })
+	note := "daily-heart-rate-variability via reconcile"
+	if len(entries) == 0 {
+		note = "no daily HRV in range"
 	}
-	return &HRVResult{
-		Date:  date,
-		RMSSD: rmssd,
-		Raw:   m,
-		Note:  "daily-heart-rate-variability via reconcile",
+	if truncated {
+		note = "truncated; narrow after_date/before_date. " + note
 	}
+	return &HRVListResult{Entries: entries, Count: len(entries), Note: note}
 }
 
 func mapWeightEntries(points []map[string]any) []map[string]any {
